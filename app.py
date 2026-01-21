@@ -197,3 +197,10 @@ else:
 # =====================
 with st.expander("📋 Xem toàn bộ dữ liệu khảo sát"):
     st.dataframe(filtered_df, use_container_width=True)
+from report import export_ppt
+
+st.markdown("## 📤 Xuất báo cáo")
+
+if st.button("📊 Xuất báo cáo PowerPoint"):
+    export_ppt(filtered_df)
+    st.success("Đã tạo file bao_cao_hai_long.pptx (xem trong thư mục dự án)")
