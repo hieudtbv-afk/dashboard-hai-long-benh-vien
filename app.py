@@ -2,19 +2,7 @@ import streamlit as st
 import pandas as pd
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-st.sidebar.header("👤 Phân quyền truy cập")
 
-role = st.sidebar.selectbox(
-    "Chọn vai trò",
-    ["Lãnh đạo", "Quản lý chất lượng", "Khoa"]
-)
-
-if role == "Khoa":
-    khoa_user = st.sidebar.selectbox(
-        "Chọn khoa của bạn",
-        df['khoa'].unique()
-    )
-    filtered_df = filtered_df[filtered_df['khoa'] == khoa_user]
 
 # =====================
 # 1. CẤU HÌNH TRANG
@@ -42,6 +30,7 @@ csv_url = (
     f"/export?format=csv&sheet={SHEET_NAME}"
 )
 
+@st.cache_data
 def load_data():
     return pd.read_csv(csv_url)
 
