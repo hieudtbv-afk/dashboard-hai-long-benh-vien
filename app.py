@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # =====================
 # 1. CẤU HÌNH TRANG
@@ -14,7 +16,6 @@ st.set_page_config(
 # =====================
 st.title("📊 DASHBOARD ĐÁNH GIÁ SỰ HÀI LÒNG NGƯỜI BỆNH")
 st.subheader("BV Đa khoa số 1 tỉnh Lào Cai")
-
 st.info("📌 Dữ liệu được cập nhật tự động từ Google Forms")
 
 # =====================
@@ -39,35 +40,72 @@ df = load_data()
 # =====================
 df['Timestamp'] = pd.to_datetime(df['Timestamp'], errors='coerce')
 df['Do_hai_long'] = pd.to_numeric(df['Do_hai_long'], errors='coerce')
-
 df = df.dropna(subset=['Timestamp', 'Do_hai_long'])
 
 # =====================
-# 5. KPI TỔNG QUAN
+# 5. BỘ LỌC (SIDEBAR)
+# =====================
+st.sidebar.header("🔎 Bộ lọc dữ liệu")
+
+# Lọc khoa
+khoa_list = sorted(df['khoa'].dropna().unique())
+selected_khoa = st.sidebar.multiselect(
+    "Chọn khoa",
+    khoa_list,
+    default=khoa_list
+)
+
+# Lọc thời gian
+min_date = df['Timestamp'].min().date()
+max_date = df['Timestamp'].max().date()
+
+date_range = st.sidebar.date_input(
+    "Chọn khoảng thời gian",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+# Áp dụng filter
+filtered_df = df[
+    (df['khoa'].isin(selected_khoa)) &
+    (df['Timestamp'].dt.date >= date_range[0]) &
+    (df['Timestamp'].dt.date <= date_range[1])
+]
+
+# =====================
+# 6. KPI TỔNG QUAN
 # =====================
 st.markdown("## 📌 Tổng quan nhanh")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("🧾 Tổng số phản hồi", len(df))
+    st.metric("🧾 Tổng số phản hồi", len(filtered_df))
 
 with col2:
-    st.metric("⭐ Điểm hài lòng trung bình", round(df['Do_hai_long'].mean(), 2))
-
-with col3:
     st.metric(
-        "🕒 Phản hồi mới nhất",
-        df['Timestamp'].max().strftime("%d/%m/%Y %H:%M")
+        "⭐ Điểm hài lòng trung bình",
+        round(filtered_df['Do_hai_long'].mean(), 2)
+        if len(filtered_df) > 0 else 0
     )
 
+with col3:
+    if len(filtered_df) > 0:
+        st.metric(
+            "🕒 Phản hồi mới nhất",
+            filtered_df['Timestamp'].max().strftime("%d/%m/%Y %H:%M")
+        )
+    else:
+        st.metric("🕒 Phản hồi mới nhất", "—")
+
 # =====================
-# 6. BIỂU ĐỒ HÀI LÒNG THEO KHOA
+# 7. BIỂU ĐỒ HÀI LÒNG THEO KHOA
 # =====================
 st.markdown("## 🏥 Mức độ hài lòng theo khoa")
 
 avg_by_khoa = (
-    df.groupby("khoa")["Do_hai_long"]
+    filtered_df.groupby("khoa")["Do_hai_long"]
     .mean()
     .sort_values(ascending=False)
 )
@@ -75,12 +113,12 @@ avg_by_khoa = (
 st.bar_chart(avg_by_khoa)
 
 # =====================
-# 7. XU HƯỚNG HÀI LÒNG THEO THỜI GIAN
+# 8. XU HƯỚNG HÀI LÒNG THEO THỜI GIAN
 # =====================
 st.markdown("## 📈 Xu hướng hài lòng theo thời gian")
 
 df_time = (
-    df.set_index("Timestamp")
+    filtered_df.set_index("Timestamp")
     .resample("D")["Do_hai_long"]
     .mean()
 )
@@ -88,11 +126,11 @@ df_time = (
 st.line_chart(df_time)
 
 # =====================
-# 8. BẢNG CẢNH BÁO PHẢN HỒI THẤP
+# 9. BẢNG CẢNH BÁO PHẢN HỒI THẤP
 # =====================
 st.markdown("## 🚨 Phản hồi cần chú ý (≤ 2 điểm)")
 
-negative_df = df[df['Do_hai_long'] <= 2]
+negative_df = filtered_df[filtered_df['Do_hai_long'] <= 2]
 
 if len(negative_df) == 0:
     st.success("🎉 Không có phản hồi tiêu cực")
@@ -105,7 +143,33 @@ else:
     )
 
 # =====================
-# 9. XEM TOÀN BỘ DỮ LIỆU (TÙY CHỌN)
+# 10. WORD CLOUD GÓP Ý
+# =====================
+st.markdown("## 🧠 Phân tích ý kiến góp ý")
+
+if 'nguoi_gop_y' in filtered_df.columns:
+    text_data = filtered_df['nguoi_gop_y'].dropna()
+    text = " ".join(text_data.astype(str))
+
+    if len(text.strip()) > 0:
+        wordcloud = WordCloud(
+            width=800,
+            height=400,
+            background_color="white",
+            collocations=False
+        ).generate(text)
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.axis("off")
+        st.pyplot(fig)
+    else:
+        st.info("Chưa có nội dung góp ý dạng chữ")
+else:
+    st.info("Không tìm thấy cột góp ý")
+
+# =====================
+# 11. XEM TOÀN BỘ DỮ LIỆU
 # =====================
 with st.expander("📋 Xem toàn bộ dữ liệu khảo sát"):
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(filtered_df, use_container_width=True)
