@@ -98,6 +98,30 @@ with col3:
         )
     else:
         st.metric("🕒 Phản hồi mới nhất", "—")
+        
+st.markdown("## 🧪 Đánh giá theo tiêu chí Bộ Y tế")
+
+def xep_loai(diem):
+    if diem >= 4.0:
+        return "🟢 Đạt"
+    elif diem >= 3.5:
+        return "🟡 Cần cải thiện"
+    else:
+        return "🔴 Không đạt"
+
+by_khoa = (
+    filtered_df.groupby("khoa")["Do_hai_long"]
+    .mean()
+    .reset_index()
+)
+
+by_khoa["Xếp loại"] = by_khoa["Do_hai_long"].apply(xep_loai)
+by_khoa["Điểm TB"] = by_khoa["Do_hai_long"].round(2)
+
+st.dataframe(
+    by_khoa[["khoa", "Điểm TB", "Xếp loại"]],
+    use_container_width=True
+)
 
 # =====================
 # 7. BIỂU ĐỒ HÀI LÒNG THEO KHOA
