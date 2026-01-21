@@ -6,4 +6,4 @@ gspread
 oauth2client
 wordcloud
 underthesea
-
+python-pptx
