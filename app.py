@@ -21,7 +21,7 @@ st.info("📌 Dữ liệu được cập nhật tự động từ Google Forms")
 # KẾT NỐI GOOGLE SHEETS
 # =====================
 SHEET_ID = "ukN4ftXcAtRidpv26"
-SHEET_NAME = "Form Responses 1"  # nếu sheet tên khác, báo mình
+SHEET_NAME = "Form_Responses"  # nếu sheet tên khác, báo mình
 
 csv_url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
