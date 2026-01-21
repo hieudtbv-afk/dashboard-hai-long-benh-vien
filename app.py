@@ -1,7 +1,11 @@
+# =====================
+# 0. IMPORT
+# =====================
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from report import export_ppt
 
 # =====================
 # 1. CẤU HÌNH TRANG (PHẢI ĐẶT TRÊN CÙNG)
@@ -12,53 +16,101 @@ st.set_page_config(
 )
 
 # =====================
-# 2. KẾT NỐI GOOGLE SHEETS
+# 2. THÔNG TIN GOOGLE SHEETS
 # =====================
-SHEET_ID = "1vHPkRbZGxhLZr9N60tFyKzgUkbnRKB_-Dg7FaCiqtBo"
-SHEET_NAME = "Form_Responses"   # ✅ ĐÚNG NHƯ BẠN XÁC NHẬN
+SHEET_ID = "ukN4ftXcAtRidpv26"
+SHEET_NAME = "Form_Responses"
 
 csv_url = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
     f"/export?format=csv&sheet={SHEET_NAME}"
 )
 
-@st.cache_data(ttl=300)  # 300 giây = 5 phút
+@st.cache_data(ttl=600)  # 10 phút cập nhật 1 lần
 def load_data():
     return pd.read_csv(csv_url)
 
 df = load_data()
 
 # =====================
-# 3. TIÊU ĐỀ DASHBOARD
+# 3. CHUẨN HOÁ DỮ LIỆU
+# =====================
+
+# Chuẩn hoá tên cột
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.lower()
+    .str.replace(" ", "_")
+)
+
+# Chuẩn hoá khoa (Nội C ≡ nội c)
+df["khoa"] = (
+    df["khoa"]
+    .astype(str)
+    .str.strip()
+    .str.title()
+)
+
+# Thời gian
+df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+
+# =====================
+# 4. MAP ĐIỂM CHO CÁC CÂU DẠNG CHỌN
+# =====================
+score_map = {
+    "Rất hài lòng": 5,
+    "Hài lòng": 4,
+    "Bình thường": 3,
+    "Chưa hài lòng": 2,
+    "Rất không hài lòng": 1,
+    "Rất kém": 1,
+    "Kém": 2
+}
+
+cols_score = [
+    "thai_do",
+    "thu_tuc",
+    "chuyen_mon",
+    "hieu_qua",
+    "thoi_gian_cho",
+    "co_so_vat_chat"
+]
+
+for col in cols_score:
+    if col in df.columns:
+        df[col + "_score"] = df[col].map(score_map)
+
+# =====================
+# 5. TÍNH ĐIỂM HÀI LÒNG TỔNG
+# =====================
+score_cols = [c for c in df.columns if c.endswith("_score")]
+
+df["diem_hai_long"] = df[score_cols].mean(axis=1)
+
+df = df.dropna(subset=["timestamp", "diem_hai_long"])
+
+# =====================
+# 6. TIÊU ĐỀ
 # =====================
 st.title("📊 DASHBOARD ĐÁNH GIÁ SỰ HÀI LÒNG NGƯỜI BỆNH")
 st.subheader("BV Đa khoa số 1 tỉnh Lào Cai")
-st.info("📌 Dữ liệu cập nhật tự động từ Google Forms")
+st.info("📌 Dữ liệu cập nhật tự động từ Google Forms (10 phút/lần)")
 
 # =====================
-# 4. CHUẨN HÓA DỮ LIỆU
-# =====================
-df.columns = df.columns.str.strip()
-
-df['Timestamp'] = pd.to_datetime(df['Timestamp'], errors='coerce')
-df['Do_hai_long'] = pd.to_numeric(df['Do_hai_long'], errors='coerce')
-
-df = df.dropna(subset=['Timestamp', 'Do_hai_long'])
-
-# =====================
-# 5. SIDEBAR – BỘ LỌC
+# 7. SIDEBAR – BỘ LỌC
 # =====================
 st.sidebar.header("🔎 Bộ lọc dữ liệu")
 
-khoa_list = sorted(df['khoa'].dropna().unique())
+khoa_list = sorted(df["khoa"].unique())
 selected_khoa = st.sidebar.multiselect(
     "Chọn khoa",
     khoa_list,
     default=khoa_list
 )
 
-min_date = df['Timestamp'].min().date()
-max_date = df['Timestamp'].max().date()
+min_date = df["timestamp"].min().date()
+max_date = df["timestamp"].max().date()
 
 date_range = st.sidebar.date_input(
     "Khoảng thời gian",
@@ -68,130 +120,93 @@ date_range = st.sidebar.date_input(
 )
 
 filtered_df = df[
-    (df['khoa'].isin(selected_khoa)) &
-    (df['Timestamp'].dt.date >= date_range[0]) &
-    (df['Timestamp'].dt.date <= date_range[1])
+    (df["khoa"].isin(selected_khoa)) &
+    (df["timestamp"].dt.date >= date_range[0]) &
+    (df["timestamp"].dt.date <= date_range[1])
 ]
 
 # =====================
-# 6. KPI TỔNG QUAN
+# 8. KPI TỔNG QUAN
 # =====================
-st.markdown("## 📌 Tổng quan nhanh")
+st.markdown("## 📌 Tổng quan")
 
 c1, c2, c3 = st.columns(3)
 
-c1.metric("🧾 Tổng số phản hồi", len(filtered_df))
-c2.metric(
-    "⭐ Điểm hài lòng trung bình",
-    round(filtered_df['Do_hai_long'].mean(), 2)
-    if len(filtered_df) else 0
-)
-c3.metric(
-    "🕒 Phản hồi mới nhất",
-    filtered_df['Timestamp'].max().strftime("%d/%m/%Y %H:%M")
-    if len(filtered_df) else "—"
-)
+c1.metric("🧾 Tổng phản hồi", len(filtered_df))
+c2.metric("⭐ Điểm TB", round(filtered_df["diem_hai_long"].mean(), 2))
+
+if len(filtered_df) > 0:
+    c3.metric(
+        "🕒 Phản hồi mới nhất",
+        filtered_df["timestamp"].max().strftime("%d/%m/%Y %H:%M")
+    )
 
 # =====================
-# 7. ĐÁNH GIÁ THEO KHOA (BỘ Y TẾ)
+# 9. ĐÁNH GIÁ THEO KHOA
 # =====================
-st.markdown("## 🧪 Đánh giá theo khoa")
-
-def xep_loai(d):
-    if d >= 4.0:
-        return "🟢 Đạt"
-    elif d >= 3.5:
-        return "🟡 Cần cải thiện"
-    else:
-        return "🔴 Không đạt"
+st.markdown("## 🏥 Hài lòng theo khoa")
 
 by_khoa = (
-    filtered_df.groupby("khoa")["Do_hai_long"]
+    filtered_df
+    .groupby("khoa")["diem_hai_long"]
     .mean()
-    .reset_index()
+    .round(2)
+    .sort_values(ascending=False)
 )
 
-by_khoa["Điểm TB"] = by_khoa["Do_hai_long"].round(2)
-by_khoa["Xếp loại"] = by_khoa["Do_hai_long"].apply(xep_loai)
-
-st.dataframe(
-    by_khoa[["khoa", "Điểm TB", "Xếp loại"]],
-    use_container_width=True
-)
+st.bar_chart(by_khoa)
 
 # =====================
-# 8. BIỂU ĐỒ
+# 10. PHẢN HỒI TIÊU CỰC
 # =====================
-st.markdown("## 🏥 Mức độ hài lòng theo khoa")
-st.bar_chart(
-    by_khoa.set_index("khoa")["Điểm TB"]
-)
+st.markdown("## 🚨 Phản hồi chưa hài lòng")
 
-st.markdown("## 📈 Xu hướng hài lòng theo thời gian")
-trend = (
-    filtered_df.set_index("Timestamp")
-    .resample("D")["Do_hai_long"]
-    .mean()
-)
-st.line_chart(trend)
-
-# =====================
-# 9. PHẢN HỒI TIÊU CỰC
-# =====================
-st.markdown("## 🚨 Phản hồi cần xử lý (≤ 2 điểm)")
-
-bad_df = filtered_df[filtered_df['Do_hai_long'] <= 2]
+bad_df = filtered_df[filtered_df["diem_hai_long"] <= 2.5]
 
 if bad_df.empty:
     st.success("🎉 Không có phản hồi tiêu cực")
 else:
-    st.dataframe(bad_df, use_container_width=True)
+    st.dataframe(
+        bad_df[
+            ["timestamp", "khoa", "diem_hai_long",
+             "thai_do", "thu_tuc", "chuyen_mon"]
+        ],
+        use_container_width=True
+    )
 
 # =====================
-# 10. WORD CLOUD GÓP Ý
+# 11. WORDCLOUD GÓP Ý
 # =====================
-st.markdown("## 💬 Ý kiến góp ý của người bệnh")
+st.markdown("## 💬 Ý kiến người bệnh")
 
-if 'nguoi_gop_y' in filtered_df.columns:
-    text = " ".join(filtered_df['nguoi_gop_y'].dropna().astype(str))
-    if text.strip():
-        wc = WordCloud(
-            width=900,
-            height=400,
-            background_color="white",
-            collocations=False
-        ).generate(text)
+text_cols = ["hai_long", "khong_hai_long"]
+texts = []
 
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.imshow(wc)
-        ax.axis("off")
-        st.pyplot(fig)
-    else:
-        st.info("Chưa có nội dung góp ý")
+for col in text_cols:
+    if col in filtered_df.columns:
+        texts += filtered_df[col].dropna().astype(str).tolist()
+
+text = " ".join(texts)
+
+if text.strip():
+    wc = WordCloud(
+        width=900,
+        height=400,
+        background_color="white"
+    ).generate(text)
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.imshow(wc)
+    ax.axis("off")
+    st.pyplot(fig)
 else:
-    st.info("Không tìm thấy cột góp ý")
-
-# =====================
-# 11. XEM DỮ LIỆU GỐC
-# =====================
-with st.expander("📋 Xem toàn bộ dữ liệu khảo sát"):
-    st.dataframe(filtered_df, use_container_width=True)
+    st.info("Chưa có nội dung góp ý")
 
 # =====================
 # 12. XUẤT BÁO CÁO
 # =====================
-from report import export_ppt
-
 st.markdown("## 📤 Xuất báo cáo")
 
-if st.button("📊 Tạo báo cáo PowerPoint"):
+if st.button("📊 Xuất PowerPoint"):
     file_path = export_ppt(filtered_df)
-
-    with open(file_path, "rb") as f:
-        st.download_button(
-            label="⬇️ Tải file PowerPoint",
-            data=f,
-            file_name="bao_cao_hai_long.pptx",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        )
-
+    st.success(f"✅ Đã tạo báo cáo: {file_path}")
