@@ -22,7 +22,7 @@ csv_url = (
     f"/export?format=csv&sheet={SHEET_NAME}"
 )
 
-@st.cache_data
+@st.cache_data(ttl=300)  # 300 giây = 5 phút
 def load_data():
     return pd.read_csv(csv_url)
 
