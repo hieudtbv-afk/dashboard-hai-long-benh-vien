@@ -42,9 +42,9 @@ csv_url = (
     f"/export?format=csv&sheet={SHEET_NAME}"
 )
 
-@st.cache_data
 def load_data():
     return pd.read_csv(csv_url)
+
 
 df = load_data()
 
