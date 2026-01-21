@@ -3,6 +3,14 @@ import pandas as pd
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 
+st.sidebar.header("🔎 Bộ lọc dữ liệu")
+
+khoa_list = sorted(df['khoa'].dropna().unique())
+selected_khoa = st.sidebar.multiselect(
+    "Chọn khoa",
+    khoa_list,
+    default=khoa_list
+)
 
 # =====================
 # 1. CẤU HÌNH TRANG
