@@ -144,19 +144,41 @@ st.dataframe(
 )
 
 # =====================
-# 9. WORD CLOUD
+# 9. PHÂN LOẠI HÀI LÒNG
 # =====================
-st.markdown("## 🧠 Ý kiến chưa hài lòng")
+st.markdown("## 😊 Tỷ lệ hài lòng / chưa hài lòng")
 
-text_data = bad_df['khong_hai_long'].dropna()
+def classify(row):
+    if row["Do_hai_long_final"] <= 3:
+        return "Không hài lòng"
+    if pd.notna(row["khong_hai_long"]) and str(row["khong_hai_long"]).strip() != "":
+        return "Không hài lòng"
+    return "Hài lòng"
 
-if len(text_data) > 0:
-    wc = WordCloud(width=800, height=400, background_color="white")
-    wc.generate(" ".join(text_data.astype(str)))
+filtered_df["Trang_thai"] = filtered_df.apply(classify, axis=1)
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.imshow(wc)
-    ax.axis("off")
-    st.pyplot(fig)
-else:
-    st.info("Chưa có góp ý tiêu cực")
+summary = filtered_df["Trang_thai"].value_counts().reset_index()
+summary.columns = ["Trạng thái", "Số lượng"]
+
+st.dataframe(summary, use_container_width=True)
+
+st.bar_chart(
+    summary.set_index("Trạng thái")["Số lượng"]
+)
+# =====================
+# 12. XUẤT BÁO CÁO
+# =====================
+from report import export_ppt
+
+st.markdown("## 📤 Xuất báo cáo")
+
+if st.button("📊 Tạo báo cáo PowerPoint"):
+    file_path = export_ppt(filtered_df)
+
+    with open(file_path, "rb") as f:
+        st.download_button(
+            label="⬇️ Tải file PowerPoint",
+            data=f,
+            file_name="bao_cao_hai_long.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
