@@ -184,6 +184,14 @@ from report import export_ppt
 
 st.markdown("## 📤 Xuất báo cáo")
 
-if st.button("📊 Xuất báo cáo PowerPoint"):
-    export_ppt(filtered_df)
-    st.success("✅ Đã tạo file bao_cao_hai_long.pptx")
+if st.button("📊 Tạo báo cáo PowerPoint"):
+    file_path = export_ppt(filtered_df)
+
+    with open(file_path, "rb") as f:
+        st.download_button(
+            label="⬇️ Tải file PowerPoint",
+            data=f,
+            file_name="bao_cao_hai_long.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+
